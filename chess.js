@@ -9,12 +9,22 @@ var board;
 var gameOver = false;
 var whiteWon = false;
 
-var boardView = [];
+var position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+// Position is set Traditional FEN Notation (FEN)
+
+var pieces = Array.from({ length: rows }, () => Array(cols).fill(null));
+// The one (1) line above was written with the assistance of Blackbox AI
 
 var difficulty = 0;
 
 var move = 1;
-var playerColorWhite = true;
+var playerColorWhite = false;
+
+let selectedPiece = null;
+let selectedPiecePosition = null;
+
+let validMoves = [];
+
 
 window.onload = function() {
     board = document.getElementById("chessboard");
@@ -23,38 +33,270 @@ window.onload = function() {
     board.height = rows * blockSize;
     context = board.getContext("2d");
 
-    document.getElementById("hard").onclick = hard();
-    document.getElementById("medium").onclick = medium();
-    document.getElementById("easy").onclick = easy();
+    document.getElementById("hard").onclick = hard;
+    document.getElementById("medium").onclick = medium;
+    document.getElementById("easy").onclick = easy;
+    document.getElementById("White").onclick = white;
+    document.getElementById("Black").onclick = black;
+
+    board.addEventListener("click", handleBoardClick);
+
 
     drawBoard();
+    parseFEN(position);
+    drawPieces();
 }
 
-function drawBoard() {
+function drawBoard(validMoves = [], selectedPiece = []) {
+    // Drawing the board
     context.fillStyle = "#FFFFFF";
     context.fillRect(0, 0, board.width, board.height);
-    context.strokeStyle = "#505050";
+    context.strokeStyle = "#000000";
+    
+    // Alternating between light and dark squares
     for (var i = 0; i < rows; i++) {
         for (var j = 0; j < cols; j++) {
-            if((i + j) % 2 == 0) {
-                context.fillStyle = "#FFFFFF";
-            } 
-            else {
-                context.fillStyle = "#000000";
+            if ((i + j) % 2 == 0) {
+                context.fillStyle = "#f0d4b4";
+            } else {
+                context.fillStyle = "#c08464";
             }
+            // Fill in squares
             context.fillRect(j * blockSize, i * blockSize, blockSize, blockSize);
-            context.strokeRect(j * blockSize, i * blockSize, blockSize, blockSize);
         }
     }
     context.strokeRect(0, 0, board.width, board.height);
+
+
+    validMoves.forEach(([row, col]) => {
+        // Highlight valid moves in red
+        context.fillStyle = "rgba(255, 0, 0, 0.7)";
+        context.fillRect(col * blockSize, row * blockSize, blockSize, blockSize);
+        // Highlights selected piece in orange
+        context.fillStyle = "#f58142"
+        context.fillRect(selectedPiece[0] * blockSize, selectedPiece[1] * blockSize, blockSize, blockSize);
+    });
+
 }
+
+function parseFEN(fen) {
+    let ranks = fen.split(' ')[0].split('/');
+    for (let i = 0; i < ranks.length; i++) {
+        let rank = ranks[i];
+        let fileIndex = 0;
+        for (let char of rank) {
+            if (isNaN(char)) {
+                pieces[i][fileIndex] = char; // Set the piece
+                fileIndex++;
+            } else {
+                fileIndex += parseInt(char); // Skip empty squares
+            }
+        }
+    }
+}
+
 
 function drawPieces() {
-    
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            let piece = pieces[i][j];
+            if (piece) {
+                let pieceImg = new Image();
+                if(piece == piece.toLowerCase()) {
+                    pieceImg.src = "./Chess_Pieces/" + piece + piece + ".png"; // Adjust the path as necessary
+                }
+                else{
+                    pieceImg.src = "./Chess_Pieces/" + piece + ".png";
+                }
+
+                pieceImg.onload = function() {
+                    context.drawImage(pieceImg, j * blockSize, i * blockSize, blockSize, blockSize);
+                }
+            }
+        }
+    }
 }
 
+function handleBoardClick(event) {
+    const rect = board.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
+    const col = Math.floor(x / blockSize);
+    const row = Math.floor(y / blockSize);
 
+    if (selectedPiece) {
+        // Attempt to move the piece
+        if (isValidMove(selectedPiece, selectedPiecePosition, [row, col])) {
+            pieces[row][col] = selectedPiece; // Move the piece
+            pieces[selectedPiecePosition[0]][selectedPiecePosition[1]] = null; // Clear the old position
+            selectedPiece = null; // Deselect the piece
+            validMoves = []; // Clear valid moves
+            drawBoard();
+            drawPieces();
+            move++;
+        } else {
+            // Invalid move, deselect the piece
+            selectedPiece = null;
+            validMoves = []; // Clear valid moves
+            drawBoard();
+            drawPieces();
+        }
+    } else {
+        // Select a piece
+        selectedPiece = pieces[row][col];
+        selectedPiecePosition = [row, col];
+
+        // Highlight valid moves
+        validMoves = getValidMoves(selectedPiece, selectedPiecePosition);
+        drawBoard(validMoves, [col, row]);
+        drawPieces();
+    }
+}
+
+function getValidMoves(piece, position) {
+    const validMoves = [];
+    const [fromRow, fromCol] = position;
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const to = [row, col];
+            if (isValidMove(piece, position, to)) {
+                validMoves.push(to);
+            }
+        }
+    }
+
+    return validMoves;
+}
+
+function isValidMove(piece, from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    if (!piece) return false; // No piece selected
+    if (toRow < 0 || toRow >= rows || toCol < 0 || toCol >= cols) return false; // Move out of bounds
+
+    const targetPiece = pieces[toRow][toCol];
+    if(targetPiece !== null) {
+        if ((targetPiece == targetPiece.toLowerCase() && piece.toLowerCase() == piece) || targetPiece == targetPiece.toUpperCase() && piece.toUpperCase() == piece) {
+            return false; // Can't capture your own piece
+        }
+    }
+
+    switch (piece.toLowerCase()) {
+        case 'p': // Pawn
+            return isValidPawnMove(piece, from, to);
+        case 'r': // Rook
+            return isValidRookMove(from, to);
+        case 'n': // Knight
+            return isValidKnightMove(from, to);
+        case 'b': // Bishop
+            return isValidBishopMove(from, to);
+        case 'q': // Queen
+            return isValidQueenMove(from, to);
+        case 'k': // King
+            return isValidKingMove(from, to);
+        default:
+            return false;
+    }
+}
+
+// Pawn move validation
+function isValidPawnMove(piece, from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+    const direction = piece === 'p' ? 1 : -1; // White pawn ('p') moves up (1), Black pawn ('P') moves down (-1)
+
+    // Normal move (one square forward)
+    if (toCol === fromCol && pieces[toRow][toCol] === null) {
+        if (toRow === fromRow + direction) return true; // Move forward one square
+        // First move can be two squares
+        if (fromRow === (piece === 'p' ? 1 : 6) && toRow === fromRow + 2 * direction) {
+            return pieces[fromRow + direction][fromCol] === null; // Ensure the square in front is empty
+        }
+    }
+
+    // Capture
+    if ((Math.abs(toCol - fromCol) == 1) && toRow == (fromRow + direction) && pieces[toRow][toCol]!== null) {
+        const targetPiece = pieces[toRow][toCol];
+        return true; // Ensure there's an opponent's piece
+    }
+    return false; // Invalid move
+}
+// Rook move validation
+
+// Rook move validation
+function isValidRookMove(from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    if (fromRow !== toRow && fromCol !== toCol) return false; // Must move in a straight line
+
+    // Check for obstacles
+    const stepRow = (toRow - fromRow) === 0 ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
+    const stepCol = (toCol - fromCol) === 0 ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
+    let currentRow = fromRow + stepRow;
+    let currentCol = fromCol + stepCol;
+
+    while (currentRow !== toRow || currentCol !== toCol) {
+        if (pieces[currentRow][currentCol] !== null) return false; // Obstacle found
+        currentRow += stepRow;
+        currentCol += stepCol;
+    }
+    return true;
+}
+
+// Knight move validation
+function isValidKnightMove(from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    const rowDiff = Math.abs(toRow - fromRow);
+    const colDiff = Math.abs(toCol - fromCol);
+    return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
+}
+
+// Bishop move validation
+function isValidBishopMove(from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    // Must move diagonally
+    if (Math.abs(toRow - fromRow) !== Math.abs(toCol - fromCol)) return false;
+
+    // Check for obstacles
+    const stepRow = (toRow - fromRow) > 0 ? 1 : -1; // Moving down or up
+    const stepCol = (toCol - fromCol) > 0 ? 1 : -1; // Moving right or left
+    let currentRow = fromRow + stepRow;
+    let currentCol = fromCol + stepCol;
+
+    // Move along the diagonal and check if there are any pieces blocking the way
+    while (currentRow !== toRow && currentCol !== toCol) {
+        if (pieces[currentRow][currentCol] !== null) {
+            return false; // An obstacle is found
+        }
+        currentRow += stepRow;
+        currentCol += stepCol;
+    }
+
+    return true; // No obstacles found
+}
+
+// Queen move validation
+function isValidQueenMove(from, to) {
+    return isValidRookMove(from, to) || isValidBishopMove(from, to); // Queen can move like, both, rooks, and bishops
+}
+
+// King move validation
+function isValidKingMove(from, to) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    const rowDiff = Math.abs(toRow - fromRow);
+    const colDiff = Math.abs(toCol - fromCol);
+    return (rowDiff <= 1 && colDiff <= 1); // one square in any direction
+}
 
 function hard() {
     difficulty = 3;
@@ -65,4 +307,18 @@ function medium() {
 }
 function easy() {
     difficulty = 1;
+}
+function white() {
+    playerColorWhite = true;
+    position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 0"
+    drawBoard();
+    parseFEN(position);
+    drawPieces();   
+}
+function black() {
+    playerColorWhite = false;
+    position = "RNBKQBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbkqbnr w KQkq 0"
+    drawBoard();
+    parseFEN(position);
+    drawPieces();
 }
