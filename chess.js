@@ -47,7 +47,7 @@ window.onload = function() {
     drawPieces();
 }
 
-function drawBoard(validMoves = [], selectedPiece = []) {
+function drawBoard(validMoves = [], selectedPiecePosition = null) {
     // Drawing the board
     context.fillStyle = "#FFFFFF";
     context.fillRect(0, 0, board.width, board.height);
@@ -57,9 +57,9 @@ function drawBoard(validMoves = [], selectedPiece = []) {
     for (var i = 0; i < rows; i++) {
         for (var j = 0; j < cols; j++) {
             if ((i + j) % 2 == 0) {
-                context.fillStyle = "#f0d4b4";
+                context.fillStyle = "#f0d4b4"; // Light square
             } else {
-                context.fillStyle = "#c08464";
+                context.fillStyle = "#c08464"; // Dark square
             }
             // Fill in squares
             context.fillRect(j * blockSize, i * blockSize, blockSize, blockSize);
@@ -67,16 +67,17 @@ function drawBoard(validMoves = [], selectedPiece = []) {
     }
     context.strokeRect(0, 0, board.width, board.height);
 
-
+    // Highlight valid moves in red
     validMoves.forEach(([row, col]) => {
-        // Highlight valid moves in red
         context.fillStyle = "rgba(255, 0, 0, 0.7)";
         context.fillRect(col * blockSize, row * blockSize, blockSize, blockSize);
-        // Highlights selected piece in orange
-        context.fillStyle = "#f58142"
-        context.fillRect(selectedPiece[0] * blockSize, selectedPiece[1] * blockSize, blockSize, blockSize);
     });
 
+    // Highlight selected piece in orange
+    if (selectedPiecePosition) {
+        context.fillStyle = "#f58142";
+        context.fillRect(selectedPiecePosition[1] * blockSize, selectedPiecePosition[0] * blockSize, blockSize, blockSize);
+    }
 }
 
 function parseFEN(fen) {
@@ -130,6 +131,7 @@ function handleBoardClick(event) {
         if (isValidMove(selectedPiece, selectedPiecePosition, [row, col])) {
             pieces[row][col] = selectedPiece; // Move the piece
             pieces[selectedPiecePosition[0]][selectedPiecePosition[1]] = null; // Clear the old position
+
             selectedPiece = null; // Deselect the piece
             validMoves = []; // Clear valid moves
             drawBoard();
@@ -143,14 +145,16 @@ function handleBoardClick(event) {
             drawPieces();
         }
     } else {
-        // Select a piece
+        // Select a piece   
         selectedPiece = pieces[row][col];
         selectedPiecePosition = [row, col];
 
         // Highlight valid moves
-        validMoves = getValidMoves(selectedPiece, selectedPiecePosition);
-        drawBoard(validMoves, [col, row]);
-        drawPieces();
+        if (selectedPiece) {
+            validMoves = getValidMoves(selectedPiece, selectedPiecePosition);
+            drawBoard(validMoves, selectedPiecePosition);
+            drawPieces();
+        }
     }
 }
 
@@ -183,6 +187,7 @@ function isValidMove(piece, from, to) {
             return false; // Can't capture your own piece
         }
     }
+    if(piece.color && (move % 2 === 0 && piece.color === 'w') || (move % 2 === 1 && piece.color === 'b')) return false; // Can't move if it's not your turn
 
     switch (piece.toLowerCase()) {
         case 'p': // Pawn
@@ -196,7 +201,7 @@ function isValidMove(piece, from, to) {
         case 'q': // Queen
             return isValidQueenMove(from, to);
         case 'k': // King
-            return isValidKingMove(from, to);
+            return isValidKingMove(piece, from, to);
         default:
             return false;
     }
@@ -289,13 +294,54 @@ function isValidQueenMove(from, to) {
 }
 
 // King move validation
-function isValidKingMove(from, to) {
+function isValidKingMove(piece, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
 
     const rowDiff = Math.abs(toRow - fromRow);
     const colDiff = Math.abs(toCol - fromCol);
-    return (rowDiff <= 1 && colDiff <= 1); // one square in any direction
+
+    // King moves one square in any direction
+    if (rowDiff > 1 || colDiff > 1) {
+        return false; // Invalid move
+    }
+
+    // Check if the target square is occupied by the same color piece
+    const targetPiece = pieces[toRow][toCol];
+    if (targetPiece) {
+        if ((targetPiece === targetPiece.toLowerCase() && piece === piece.toLowerCase()) || 
+            (targetPiece === targetPiece.toUpperCase() && piece === piece.toUpperCase())) {
+            return false; // Can't move to a square occupied by your own piece
+        }
+    }
+
+    // Check if the move puts the king in check
+    const kingColor = piece === piece.toUpperCase() ? 'w' : 'b'; // Determine king's color
+    if (isSquareUnderAttack(kingColor === 'w' ? 'b' : 'w', to)) {
+        return false; // Can't move to a square that is under attack
+    }
+
+    return true; // Valid move
+}
+function isSquareUnderAttack(color, square) {
+    const [targetRow, targetCol] = square;
+
+    // Check all pieces of the opponent
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const piece = pieces[row][col];
+            if (piece && ((color === 'w' && piece === piece.toLowerCase()) || 
+                           (color === 'b' && piece === piece.toUpperCase()))) {
+                const fromPosition = [row, col];
+                // Check if the opponent's piece can move to the target square
+                if (isValidMove(piece, fromPosition, square)) {
+                    return true; // The square is under attack
+                }
+            }
+        }
+    }
+
+    return false; // The square is not under attack
 }
 
 function hard() {
