@@ -33,11 +33,16 @@ window.onload = function() {
     board.height = rows * blockSize;
     context = board.getContext("2d");
 
+    let hard = document.getElementById("hard");
+    let medium = document.getElementById("medium");
+    let easy = document.getElementById("easy");
+
     document.getElementById("hard").onclick = hard;
     document.getElementById("medium").onclick = medium;
     document.getElementById("easy").onclick = easy;
-    document.getElementById("White").onclick = white;
-    document.getElementById("Black").onclick = black;
+    document.getElementById("reset").onclick = reset;
+
+    const difficulty = document.getElementById("difficulty");
 
     board.addEventListener("click", handleBoardClick);
 
@@ -104,7 +109,7 @@ function drawPieces() {
             if (piece) {
                 let pieceImg = new Image();
                 if(piece == piece.toLowerCase()) {
-                    pieceImg.src = "./Chess_Pieces/" + piece + piece + ".png"; // Adjust the path as necessary
+                    pieceImg.src = "./Chess_Pieces/" + piece + piece + ".png";
                 }
                 else{
                     pieceImg.src = "./Chess_Pieces/" + piece + ".png";
@@ -137,6 +142,8 @@ function handleBoardClick(event) {
             drawBoard();
             drawPieces();
             move++;
+            console.log(move);
+
         } else {
             // Invalid move, deselect the piece
             selectedPiece = null;
@@ -187,8 +194,9 @@ function isValidMove(piece, from, to) {
             return false; // Can't capture your own piece
         }
     }
-    if(piece.color && (move % 2 === 0 && piece.color === 'w') || (move % 2 === 1 && piece.color === 'b')) return false; // Can't move if it's not your turn
-
+    if(piece && (move % 2 === 0 && piece === piece.toUpperCase()) || (move % 2 === 1 && piece === piece.toLowerCase())) {
+        return false; // Can't move if it's not your turn
+    }
     switch (piece.toLowerCase()) {
         case 'p': // Pawn
             return isValidPawnMove(piece, from, to);
@@ -211,8 +219,9 @@ function isValidMove(piece, from, to) {
 function isValidPawnMove(piece, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    const direction = piece === 'p' ? 1 : -1; // White pawn ('p') moves up (1), Black pawn ('P') moves down (-1)
 
+    const direction = (piece === 'p' ? 1 : -1);
+    
     // Normal move (one square forward)
     if (toCol === fromCol && pieces[toRow][toCol] === null) {
         if (toRow === fromRow + direction) return true; // Move forward one square
@@ -229,7 +238,6 @@ function isValidPawnMove(piece, from, to) {
     }
     return false; // Invalid move
 }
-// Rook move validation
 
 // Rook move validation
 function isValidRookMove(from, to) {
@@ -294,6 +302,7 @@ function isValidQueenMove(from, to) {
 }
 
 // King move validation
+// King move validation
 function isValidKingMove(piece, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
@@ -302,46 +311,88 @@ function isValidKingMove(piece, from, to) {
     const colDiff = Math.abs(toCol - fromCol);
 
     // King moves one square in any direction
-    if (rowDiff > 1 || colDiff > 1) {
+    if (rowDiff > 1 || colDiff > 1 || (rowDiff === 0 && colDiff === 0)) {
         return false; // Invalid move
     }
 
-    // Check if the target square is occupied by the same color piece
-    const targetPiece = pieces[toRow][toCol];
-    if (targetPiece) {
-        if ((targetPiece === targetPiece.toLowerCase() && piece === piece.toLowerCase()) || 
-            (targetPiece === targetPiece.toUpperCase() && piece === piece.toUpperCase())) {
-            return false; // Can't move to a square occupied by your own piece
-        }
-    }
-
     // Check if the move puts the king in check
-    const kingColor = piece === piece.toUpperCase() ? 'w' : 'b'; // Determine king's color
-    if (isSquareUnderAttack(kingColor === 'w' ? 'b' : 'w', to)) {
-        return false; // Can't move to a square that is under attack
-    }
+    const kingColor = (piece === piece.toUpperCase() ? 'w' : 'b'); // Determine king's color
 
-    return true; // Valid move
+    // Temporarily make the move
+    const originalPieceAtTarget = pieces[toRow][toCol];
+    pieces[toRow][toCol] = piece; // Move the king to the target square
+    pieces[fromRow][fromCol] = null; // Clear the original square
+
+    const isInCheck = isSquareUnderAttack(kingColor === 'w' ? 'b' : 'w', to); // Check if the new position is under attack
+
+    // Undo the temporary move
+    pieces[fromRow][fromCol] = piece; // Restore the king's original position
+    pieces[toRow][toCol] = originalPieceAtTarget; // Restore the target square
+
+    return !isInCheck; // Valid move if the king is not in check after the move
 }
 function isSquareUnderAttack(color, square) {
     const [targetRow, targetCol] = square;
 
-    // Check all pieces of the opponent
+        // Check if the target square is under attack by pawns first
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                let piece = pieces[row][col];
+                if (piece && ((color === 'b' && piece === piece.toLowerCase()) || 
+                            (color === 'w' && piece === piece.toUpperCase()))) {
+                    // Check if the opponent's piece is a pawn
+                    if (piece === 'p') { // Black pawn
+                        if ((col - 1 === targetCol && row + 1 === targetRow) || 
+                            (col + 1 === targetCol && row + 1 === targetRow)) {
+                            return true; // Target square is under attack by black pawn
+                        }
+                    } else if (piece === 'P') { // White pawn
+                        if ((col - 1 === targetCol && row - 1 === targetRow) || 
+                            (col + 1 === targetCol && row - 1 === targetRow)) {
+                            return true; // Target square is under attack by white pawn
+                        }
+                    }
+                    else {
+                        if(isValidMove(piece, [row, col], square)) {
+                            return true; // The square is under attack
+                    }
+                }
+            }
+        }
+    }
+    return false; // The square is not under attack
+}
+function isSquareDefended(color, square) {
+    const [targetRow, targetCol] = square;
+
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             const piece = pieces[row][col];
-            if (piece && ((color === 'w' && piece === piece.toLowerCase()) || 
-                           (color === 'b' && piece === piece.toUpperCase()))) {
+            if (piece && ((color === 'b' && piece === piece.toLowerCase()) || 
+                           (color === 'w' && piece === piece.toUpperCase()))) {
                 const fromPosition = [row, col];
-                // Check if the opponent's piece can move to the target square
                 if (isValidMove(piece, fromPosition, square)) {
-                    return true; // The square is under attack
+                    return true; // The square is defended
                 }
             }
         }
     }
 
-    return false; // The square is not under attack
+    return false; // The square is not defended
+}
+function isKingInCheck(color, kingSquare) {
+
+    return isSquareUnderAttack((color === 'w' ? 'b' : 'w'), kingSquare);
+}
+
+function isKingMated(color, square) {
+    const kingMoves = getValidMoves(kingColor, kingSquare); // Get all possible moves for the king
+    if(!kingMoves.length) {
+        return true; // The king can't move
+    }
+    else {
+        return false;
+    }
 }
 
 function hard() {
@@ -354,17 +405,6 @@ function medium() {
 function easy() {
     difficulty = 1;
 }
-function white() {
-    playerColorWhite = true;
-    position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 0"
-    drawBoard();
-    parseFEN(position);
-    drawPieces();   
-}
-function black() {
-    playerColorWhite = false;
-    position = "RNBKQBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbkqbnr w KQkq 0"
-    drawBoard();
-    parseFEN(position);
-    drawPieces();
+function reset() {
+    location.reload();
 }
