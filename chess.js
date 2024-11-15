@@ -42,7 +42,7 @@ window.onload = function() {
     document.getElementById("easy").onclick = easy;
     document.getElementById("reset").onclick = reset;
 
-    const difficulty = document.getElementById("difficulty");
+    var difficulty = document.getElementById("difficulty");
 
     board.addEventListener("click", handleBoardClick);
 
@@ -156,10 +156,10 @@ function handleBoardClick(event) {
         selectedPiece = pieces[row][col];
         selectedPiecePosition = [row, col];
 
-        // Highlight valid moves
+        // Highlight valid moves for the selected piece
         if (selectedPiece) {
-            validMoves = getValidMoves(selectedPiece, selectedPiecePosition);
-            drawBoard(validMoves, selectedPiecePosition);
+            validMoves = getValidMoves(selectedPiece, selectedPiecePosition); // Get valid moves
+            drawBoard(validMoves, selectedPiecePosition); // Draw the board with valid moves
             drawPieces();
         }
     }
@@ -173,13 +173,27 @@ function getValidMoves(piece, position) {
         for (let col = 0; col < cols; col++) {
             const to = [row, col];
             if (isValidMove(piece, position, to)) {
-                validMoves.push(to);
+                // If it's a king's move, check if the move puts the king in check
+                if (piece.toLowerCase() === 'k') {
+                    // Check if the king will be in check after the move
+                    if (!isSquareUnderAttack(piece === piece.toUpperCase() ? 'b' : 'w', to)) {
+                        validMoves.push(to);
+                    }
+                    else {
+                        continue;
+                    }
+                } else {
+                    // For non-king pieces, just add all valid moves
+                    validMoves.push(to);
+                }
             }
         }
     }
 
     return validMoves;
 }
+
+
 
 function isValidMove(piece, from, to) {
     const [fromRow, fromCol] = from;
@@ -302,7 +316,6 @@ function isValidQueenMove(from, to) {
 }
 
 // King move validation
-// King move validation
 function isValidKingMove(piece, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
@@ -315,14 +328,12 @@ function isValidKingMove(piece, from, to) {
         return false; // Invalid move
     }
 
-    // Check if the move puts the king in check
-    const kingColor = (piece === piece.toUpperCase() ? 'w' : 'b'); // Determine king's color
-
     // Temporarily make the move
     const originalPieceAtTarget = pieces[toRow][toCol];
     pieces[toRow][toCol] = piece; // Move the king to the target square
     pieces[fromRow][fromCol] = null; // Clear the original square
 
+    const kingColor = (piece === piece.toUpperCase() ? 'w' : 'b'); // Determine king's color
     const isInCheck = isSquareUnderAttack(kingColor === 'w' ? 'b' : 'w', to); // Check if the new position is under attack
 
     // Undo the temporary move
@@ -334,28 +345,13 @@ function isValidKingMove(piece, from, to) {
 function isSquareUnderAttack(color, square) {
     const [targetRow, targetCol] = square;
 
-        // Check if the target square is under attack by pawns first
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 let piece = pieces[row][col];
                 if (piece && ((color === 'b' && piece === piece.toLowerCase()) || 
                             (color === 'w' && piece === piece.toUpperCase()))) {
-                    // Check if the opponent's piece is a pawn
-                    if (piece === 'p') { // Black pawn
-                        if ((col - 1 === targetCol && row + 1 === targetRow) || 
-                            (col + 1 === targetCol && row + 1 === targetRow)) {
-                            return true; // Target square is under attack by black pawn
-                        }
-                    } else if (piece === 'P') { // White pawn
-                        if ((col - 1 === targetCol && row - 1 === targetRow) || 
-                            (col + 1 === targetCol && row - 1 === targetRow)) {
-                            return true; // Target square is under attack by white pawn
-                        }
-                    }
-                    else {
-                        if(isValidMove(piece, [row, col], square)) {
-                            return true; // The square is under attack
-                    }
+                    if(isValidMove(piece, [row, col], square)) {
+                        return true; // The square is under attack
                 }
             }
         }
@@ -379,20 +375,6 @@ function isSquareDefended(color, square) {
     }
 
     return false; // The square is not defended
-}
-function isKingInCheck(color, kingSquare) {
-
-    return isSquareUnderAttack((color === 'w' ? 'b' : 'w'), kingSquare);
-}
-
-function isKingMated(color, square) {
-    const kingMoves = getValidMoves(kingColor, kingSquare); // Get all possible moves for the king
-    if(!kingMoves.length) {
-        return true; // The king can't move
-    }
-    else {
-        return false;
-    }
 }
 
 function hard() {
