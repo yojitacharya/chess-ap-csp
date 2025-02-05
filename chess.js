@@ -1,4 +1,8 @@
 // The functions in the following code were debugged by ChatGPT and Claude
+// The AI models helped me to grasp a few patterns and understand the logic to create this game.
+// Chess piece images were taken from Wikimedia Commons:
+// https://commons.wikimedia.org/wiki/File:Chess_Pieces_Sprite.svg
+// https://upload.wikimedia.org/wikipedia/commons/b/b2/Chess_Pieces_Sprite.svg
 
 let blockSize = 90;
 
@@ -13,6 +17,8 @@ let gameOver = false;
 let position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 // Position is set Traditional FEN Notation (FEN)
 
+// This array is important for the function because it contains all of the information of the position.
+// Would be incredibly difficult to program without this array.
 let pieces = Array.from({ length: rows }, () => Array(cols).fill(null));
 // The one (1) line above was written with the assistance of Blackbox AI
 
@@ -31,9 +37,11 @@ let showingPromotionAlert = false;
 let blackKingside = true;
 let blackQueenside = true;
 let whiteKingside = true;
-let whiteQueenside = true;
+let whiteQueenside = true; 
 
+let moves = [];
 
+// Load all of the pieces and the board onto the canvas.
 window.onload = function() {
     board = document.getElementById("chessboard");
 
@@ -42,9 +50,6 @@ window.onload = function() {
     context = board.getContext("2d");
 
     document.getElementById("reset").onclick = reset;
-    
-    // this was never used, but an ai is planned to be added.
-    var difficulty = document.getElementById("difficulty");
 
     board.addEventListener("click", handleBoardClick);
 
@@ -54,6 +59,7 @@ window.onload = function() {
     drawPieces();
 }
 
+// Draw the board and load the square colors
 function drawBoard(validMoves = [], selectedPiecePosition = null) {
     // Drawing the board
     context.fillStyle = "#FFFFFF";
@@ -87,6 +93,7 @@ function drawBoard(validMoves = [], selectedPiecePosition = null) {
     }
 }
 
+// this one (1) function below was written by ChatGPT to parse the FEN input (added for future use)
 function parseFEN(fen) {
     let ranks = fen.split(' ')[0].split('/');
     for (let i = 0; i < ranks.length; i++) {
@@ -103,7 +110,7 @@ function parseFEN(fen) {
     }
 }
 
-
+// Using the array "pieces", all of the pieces are placed on their correct squares to create the position
 function drawPieces() {
     for (let i = 0; i < rows; i++) {
         for (let j = 0; j < cols; j++) {
@@ -125,24 +132,32 @@ function drawPieces() {
     }
 }
 
+/*
+Handles clicks on the board by determining whether or not pieces were clicked--in which case they will be highlighted and their
+valid moves will be highlighted. If a piece is selected and another square is selected after, the highlight will disappear.
+if the square is a valid move for the piece, it will move there and the turn will change. If the square is not a valid move for the piece
+it will deselct the piece and the highlight will disappear.
+*/ 
 function handleBoardClick(event) {
-    if (showingPromotionAlert) return; // Ignore clicks while promotion dialog is showing
+    if (showingPromotionAlert) return; // Ignores clicks while promotion dialog is showing
     
-    const rect = board.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    let rect = board.getBoundingClientRect();
+    let x = event.clientX - rect.left;
+    let y = event.clientY - rect.top;
 
-    const col = Math.floor(x / blockSize);
-    const row = Math.floor(y / blockSize);
+    let col = Math.floor(x / blockSize);
+    let row = Math.floor(y / blockSize);
 
     if (selectedPiece) {
         // Attempt to move the piece
         if (isValidMove(selectedPiece, selectedPiecePosition, [row, col])) {
+
+            isWhite = selectedPiece === selectedPiece.toUpperCase();
+
             if (needsPromotion(selectedPiece, [row, col])) {
                 // Show promotion dialog
                 showingPromotionAlert = true;
-                const isWhite = selectedPiece === selectedPiece.toUpperCase();
-                
+
                 showPromotionDialog(isWhite, (promotedPiece) => {
                     // Complete the move with the promoted piece
                     pieces[row][col] = promotedPiece;
@@ -160,7 +175,7 @@ function handleBoardClick(event) {
                     
                     // Check for checkmate
                     if (isCheckmate()) {
-                        const winner = move % 2 === 0 ? "White" : "Black";
+                        let winner = move % 2 === 0 ? "White" : "Black";
                         setTimeout(() => {
                             alert("Checkmate! " + winner + " wins!");
                             gameOver = true;
@@ -173,12 +188,18 @@ function handleBoardClick(event) {
                 if (selectedPiece.toLowerCase() === 'k' && Math.abs(col - selectedPiecePosition[1]) === 2) {
                     // Check for castling move (rook should not have moved, and no pieces in between)
                     if (col === 6) { // Kingside
-                        pieces[selectedPiecePosition[0]][5] = pieces[selectedPiecePosition[0]][7];  // Move rook to kingside
-                        pieces[selectedPiecePosition[0]][7] = null;                // Clear old rook position
+                        pieces[selectedPiecePosition[0]][5] = pieces[selectedPiecePosition[0]][7];
+                        pieces[selectedPiecePosition[0]][7] = null; 
                     } else if (col === 2) { // Queenside
-                        pieces[selectedPiecePosition[0]][3] = pieces[selectedPiecePosition[0]][0];  // Move rook to queenside
-                        pieces[selectedPiecePosition[0]][0] = null;                // Clear old rook position
+                        pieces[selectedPiecePosition[0]][3] = pieces[selectedPiecePosition[0]][0];
+                        pieces[selectedPiecePosition[0]][0] = null;
                     }
+                }
+
+                if(Math.abs(selectedPiecePosition[0] - row) === 1 && Math.abs(selectedPiecePosition[1] - col) === 1 && selectedPiece === isWhite ? 'P' : 'p' && selectedPiece === 'P' || selectedPiece === 'p') {
+                    pieces[row - (isWhite ? -1 : 1)][col] = null;
+                    console.log(isWhite);
+                    console.log(Math.abs(selectedPiecePosition[0] - row),Math.abs(selectedPiecePosition[1] - col));
                 }
 
                 // Normal move without promotion
@@ -195,13 +216,16 @@ function handleBoardClick(event) {
                     whiteQueenside = false;
                 }
 
+                moves.push([[selectedPiecePosition[0], selectedPiecePosition[1]], [row, col], selectedPiece]);
+                console.log(moves);
+
                 selectedPiece = null;
                 validMoves = [];
                 drawBoard();
                 drawPieces();
                 move++;
                 if (isCheckmate()) {
-                    const winner = move % 2 === 0 ? "White" : "Black";
+                    let winner = move % 2 === 0 ? "White" : "Black";
                     setTimeout(() => {
                         alert("Checkmate! " + winner + " wins!");
                         gameOver = true;
@@ -228,12 +252,14 @@ function handleBoardClick(event) {
         }
     }
 }
+
+// This function is different from the next function because this function is used for checking if the king is in check
 function getValidMoves(piece, position) {
-    const validMoves = [];
-    const [fromRow, fromCol] = position;
-    const isKing = piece.toLowerCase() === 'k';
-    const pieceColor = piece === piece.toUpperCase() ? 'w' : 'b';
-    const enemyColor = pieceColor === 'w' ? 'b' : 'w';
+    let validMoves = [];
+    let [fromRow, fromCol] = position;
+    let isKing = piece.toLowerCase() === 'k';
+    let pieceColor = piece === piece.toUpperCase() ? 'w' : 'b';
+    let enemyColor = pieceColor === 'w' ? 'b' : 'w';
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -243,7 +269,7 @@ function getValidMoves(piece, position) {
                     validMoves.push([row, col]);
                 } else {
                     // For other pieces, we need to verify the move doesn't put our king in check
-                    const originalTargetPiece = pieces[row][col];
+                    let originalTargetPiece = pieces[row][col];
                     pieces[row][col] = piece;
                     pieces[fromRow][fromCol] = null;
 
@@ -263,7 +289,7 @@ function getValidMoves(piece, position) {
                     }
 
                     // Check if our king would be in check after this move
-                    const wouldPutKingInCheck = isSquareUnderAttack(enemyColor, kingPos);
+                    let wouldPutKingInCheck = isSquareUnderAttack(enemyColor, kingPos);
 
                     // Undo temporary move
                     pieces[fromRow][fromCol] = piece;
@@ -281,15 +307,15 @@ function getValidMoves(piece, position) {
 }
 
 
-
+// This function is checking whether a piece can move to a square or not. Used for actually moving pieces.
 function isValidMove(piece, from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
     if (!piece) return false; // No piece selected
     if (toRow < 0 || toRow >= rows || toCol < 0 || toCol >= cols) return false; // Move out of bounds
 
-    const targetPiece = pieces[toRow][toCol];
+    let targetPiece = pieces[toRow][toCol];
     if(targetPiece !== null) {
         if ((targetPiece == targetPiece.toLowerCase() && piece.toLowerCase() == piece) || 
             targetPiece == targetPiece.toUpperCase() && piece.toUpperCase() == piece) {
@@ -303,6 +329,7 @@ function isValidMove(piece, from, to) {
     }
 
     // Check if the move is valid according to piece rules
+    // There is a function for each piece ()
     let isValidPieceMove = false;
     switch (piece.toLowerCase()) {
         case 'p':
@@ -318,7 +345,9 @@ function isValidMove(piece, from, to) {
             isValidPieceMove = isValidBishopMove(from, to);
             break;
         case 'q':
-            isValidPieceMove = isValidQueenMove(from, to);
+            // Queens move diagonally and vertically/horizontally 
+            // so checking for bishop / rook moves works the same as creating a seperate function.
+            isValidPieceMove = isValidBishopMove(from, to) || isValidRookMove(from, to);
             break;
         case 'k':
             isValidPieceMove = isValidKingMove(piece, from, to);
@@ -332,13 +361,13 @@ function isValidMove(piece, from, to) {
     // If it's not a king move, check if this move would put our own king in check
     if (piece.toLowerCase() !== 'k') {
         // Make temporary move
-        const originalTargetPiece = pieces[toRow][toCol];
+        let originalTargetPiece = pieces[toRow][toCol];
         pieces[toRow][toCol] = piece;
         pieces[fromRow][fromCol] = null;
 
         // Find our king's position
-        const pieceColor = piece === piece.toUpperCase() ? 'w' : 'b';
-        const enemyColor = pieceColor === 'w' ? 'b' : 'w';
+        let pieceColor = piece === piece.toUpperCase() ? 'w' : 'b';
+        let enemyColor = pieceColor === 'w' ? 'b' : 'w';
         let kingPos = null;
 
         for (let i = 0; i < rows; i++) {
@@ -355,7 +384,7 @@ function isValidMove(piece, from, to) {
         }
 
         // Check if our king would be in check after this move
-        const wouldPutKingInCheck = isSquareUnderAttack(enemyColor, kingPos);
+        let wouldPutKingInCheck = isSquareUnderAttack(enemyColor, kingPos);
 
         // Undo temporary move
         pieces[fromRow][fromCol] = piece;
@@ -371,10 +400,10 @@ function isValidMove(piece, from, to) {
 
 // Pawn move validation
 function isValidPawnMove(piece, from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
-    const direction = (piece === 'p' ? 1 : -1);
+    let direction = (piece === 'p' ? 1 : -1);
     
     // Normal move (one square forward)
     if (toCol === fromCol && pieces[toRow][toCol] === null) {
@@ -389,10 +418,15 @@ function isValidPawnMove(piece, from, to) {
             return pieces[fromRow + direction][fromCol] === null; // Ensure the square in front is empty
         }
     }
-
+    // En passant
+    if(move > 2) {
+      if (fromRow + direction == toRow && (toCol === fromCol + 1 || toCol === fromCol - 1) && pieces[fromRow][toCol] === (piece === 'p' ? 'P' : 'p') && moves[moves.length -1][2] === (piece === "p" ? "P" : "p") && Math.abs(moves[moves.length - 1][0][0] - moves[moves.length -1][1][0]) === 2  && moves[moves.length - 1][0][1] == toCol) {
+            return true; // En passant
+        }
+    }
     // Capture
     if ((Math.abs(toCol - fromCol) == 1) && toRow == (fromRow + direction) && pieces[toRow][toCol]!== null) {
-        const targetPiece = pieces[toRow][toCol];
+        let targetPiece = pieces[toRow][toCol];
         return true; // Ensure there's an opponent's piece
     }
     return false; // Invalid move
@@ -400,14 +434,14 @@ function isValidPawnMove(piece, from, to) {
 
 // Rook move validation
 function isValidRookMove(from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
     if (fromRow !== toRow && fromCol !== toCol) return false; // Must move in a straight line
 
     // Check for obstacles
-    const stepRow = (toRow - fromRow) === 0 ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
-    const stepCol = (toCol - fromCol) === 0 ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
+    let stepRow = (toRow - fromRow) === 0 ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
+    let stepCol = (toCol - fromCol) === 0 ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
     let currentRow = fromRow + stepRow;
     let currentCol = fromCol + stepCol;
 
@@ -431,25 +465,25 @@ function isValidRookMove(from, to) {
 
 // Knight move validation
 function isValidKnightMove(from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
-    const rowDiff = Math.abs(toRow - fromRow);
-    const colDiff = Math.abs(toCol - fromCol);
+    let rowDiff = Math.abs(toRow - fromRow);
+    let colDiff = Math.abs(toCol - fromCol);
     return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
 }
 
 // Bishop move validation
 function isValidBishopMove(from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
     // Must move diagonally
     if (Math.abs(toRow - fromRow) !== Math.abs(toCol - fromCol)) return false;
 
     // Check for obstacles
-    const stepRow = (toRow - fromRow) > 0 ? 1 : -1; // Moving down or up
-    const stepCol = (toCol - fromCol) > 0 ? 1 : -1; // Moving right or left
+    let stepRow = (toRow - fromRow) > 0 ? 1 : -1; // Moving down or up
+    let stepCol = (toCol - fromCol) > 0 ? 1 : -1; // Moving right or left
     let currentRow = fromRow + stepRow;
     let currentCol = fromCol + stepCol;
 
@@ -465,21 +499,16 @@ function isValidBishopMove(from, to) {
     return true; // No obstacles found
 }
 
-// Queen move validation
-function isValidQueenMove(from, to) {
-    return isValidRookMove(from, to) || isValidBishopMove(from, to); // Queen can move like, both, rooks, and bishops
-}
-
 // King move validation
 function isValidKingMove(piece, from, to) {
-    const [fromRow, fromCol] = from;
-    const [toRow, toCol] = to;
+    let [fromRow, fromCol] = from;
+    let [toRow, toCol] = to;
 
-    const rowDiff = Math.abs(toRow - fromRow);
-    const colDiff = Math.abs(toCol - fromCol);
+    let rowDiff = Math.abs(toRow - fromRow);
+    let colDiff = Math.abs(toCol - fromCol);
 
-    const kingColor = piece === piece.toUpperCase() ? 'w' : 'b';
-    const enemyColor = kingColor === 'w' ? 'b' : 'w';
+    let kingColor = piece === piece.toUpperCase() ? 'w' : 'b';
+    let enemyColor = kingColor === 'w' ? 'b' : 'w';
 
     if (rowDiff > 1 || colDiff > 1) {
         if (rowDiff === 0 && colDiff === 2) {
@@ -509,12 +538,12 @@ function isValidKingMove(piece, from, to) {
     
 
     // Make temporary move
-    const originalTargetPiece = pieces[toRow][toCol];
+    let originalTargetPiece = pieces[toRow][toCol];
     pieces[toRow][toCol] = piece;
     pieces[fromRow][fromCol] = null;
 
     // Check if the new position would put the king in check
-    const wouldBeInCheck = isSquareUnderAttack(enemyColor, [toRow, toCol]);
+    let wouldBeInCheck = isSquareUnderAttack(enemyColor, [toRow, toCol]);
 
     // Undo temporary move
     pieces[fromRow][fromCol] = piece;
@@ -523,7 +552,7 @@ function isValidKingMove(piece, from, to) {
     return !wouldBeInCheck;
 }
 function isSquareUnderAttack(attackingColor, square) {
-    const [targetRow, targetCol] = square;
+    let [targetRow, targetCol] = square;
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -554,12 +583,12 @@ function isSquareUnderAttack(attackingColor, square) {
                         if (isValidBishopMove(from, to)) return true;
                         break;
                     case 'q':
-                        if (isValidQueenMove(from, to)) return true;
+                        if (isValidBishopMove(from, to) || isValidRookMove(from, to)) return true;
                         break;
                     case 'k':
                         // For king attacks, just check one square distance
-                        const rowDiff = Math.abs(targetRow - row);
-                        const colDiff = Math.abs(targetCol - col);
+                        let rowDiff = Math.abs(targetRow - row);
+                        let colDiff = Math.abs(targetCol - col);
                         if (rowDiff <= 1 && colDiff <= 1) return true;
                         break;
                 }
@@ -569,14 +598,14 @@ function isSquareUnderAttack(attackingColor, square) {
     return false;
 }
 function isSquareDefended(color, square) {
-    const [targetRow, targetCol] = square;
+    let [targetRow, targetCol] = square;
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            const piece = pieces[row][col];
+            let piece = pieces[row][col];
             if (piece && ((color === 'b' && piece === piece.toLowerCase()) || 
                            (color === 'w' && piece === piece.toUpperCase()))) {
-                const fromPosition = [row, col];
+                let fromPosition = [row, col];
                 if (isValidMove(piece, fromPosition, square)) {
                     return true; // The square is defended
                 }
@@ -589,8 +618,8 @@ function isSquareDefended(color, square) {
 
 function isCheckmate() {
     // Find the king that's currently being checked
-    const isWhiteTurn = move % 2 === 1;
-    const kingToFind = isWhiteTurn ? 'K' : 'k';
+    let isWhiteTurn = move % 2 === 1;
+    let kingToFind = isWhiteTurn ? 'K' : 'k';
     let kingPos = null;
 
     // Find the current player's king position
@@ -607,7 +636,7 @@ function isCheckmate() {
     if (!kingPos) return false;
 
     // Check if king is in check
-    const enemyColor = isWhiteTurn ? 'b' : 'w';
+    let enemyColor = isWhiteTurn ? 'b' : 'w';
     if (!isSquareUnderAttack(enemyColor, kingPos)) {
         return false;
     }
@@ -615,7 +644,7 @@ function isCheckmate() {
     // Try every possible move for the current player's pieces
     for (let fromRow = 0; fromRow < rows; fromRow++) {
         for (let fromCol = 0; fromCol < cols; fromCol++) {
-            const piece = pieces[fromRow][fromCol];
+            let piece = pieces[fromRow][fromCol];
             
             if (!piece || (isWhiteTurn && piece === piece.toLowerCase()) || 
                 (!isWhiteTurn && piece === piece.toUpperCase())) {
@@ -626,7 +655,7 @@ function isCheckmate() {
                 for (let toCol = 0; toCol < cols; toCol++) {
                     if (isValidMove(piece, [fromRow, fromCol], [toRow, toCol])) {
                         // Make temporary move
-                        const originalTargetPiece = pieces[toRow][toCol];
+                        let originalTargetPiece = pieces[toRow][toCol];
                         pieces[toRow][toCol] = piece;
                         pieces[fromRow][fromCol] = null;
 
@@ -634,7 +663,7 @@ function isCheckmate() {
                         let newKingPos = piece.toLowerCase() === 'k' ? [toRow, toCol] : kingPos;
 
                         // Check if king is still in check after this move
-                        const stillInCheck = isSquareUnderAttack(enemyColor, newKingPos);
+                        let stillInCheck = isSquareUnderAttack(enemyColor, newKingPos);
 
                         // Undo temporary move
                         pieces[fromRow][fromCol] = piece;
@@ -656,10 +685,10 @@ function isCheckmate() {
 
 // This function has all the css stuff that displays the promotion dialog
 function showPromotionDialog(isWhite, callback) {
-    const pieces = ['q', 'r', 'b', 'n'];
+    let pieces = ['q', 'r', 'b', 'n'];
 
-    // Create dialog container (this dialog container was created with the assistanc of Claude AI)
-    const dialog = document.createElement('div');
+    // Create dialog container (this dialog container was created with the assistance of Claude AI)
+    let dialog = document.createElement('div');
     dialog.style.position = 'fixed';
     dialog.style.top = '0';
     dialog.style.left = '0';
@@ -671,32 +700,32 @@ function showPromotionDialog(isWhite, callback) {
     dialog.style.justifyContent = 'center';
     
     // Create dialog content
-    const content = document.createElement('div');
+    let content = document.createElement('div');
     content.style.backgroundColor = 'white';
     content.style.padding = '15px';
     content.style.borderRadius = '8px';
     content.style.textAlign = 'center';
     
-    const title = document.createElement('h2');
+    let title = document.createElement('h2');
     title.textContent = 'Choose promotion piece:';
     title.style.marginBottom = '10px';
     content.appendChild(title);
     
     // Create piece buttons
-    const buttonContainer = document.createElement('div');
+    let buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
     buttonContainer.style.gap = '10px';
     buttonContainer.style.justifyContent = 'center';
     
     pieces.forEach(piece => {
-        const button = document.createElement('button');
+        let button = document.createElement('button');
         button.style.width = '60px';
         button.style.height = '60px';
         button.style.border = '1px solid #ccc';
         button.style.borderRadius = '4px';
         button.style.cursor = 'pointer';
         
-        const img = new Image();
+        let img = new Image();
         img.src = `./Chess_Pieces/${isWhite ? piece.toUpperCase() : piece + piece}.png`;
         img.style.width = '100%';
         img.style.height = '100%';
@@ -717,12 +746,12 @@ function showPromotionDialog(isWhite, callback) {
 }
 
 function needsPromotion(piece, position) {
-    const [row, col] = position;
+    let [row, col] = position;
     return piece.toLowerCase() === 'p' && (row === 0 || row === 7);
 }
 
 function canCastle(color, position) {
-    const [row, col] = position;
+    let [row, col] = position;
     if (color === 'w') {
         return (col === 4 && pieces[row][0] === null && pieces[row][1] === null && pieces[row][2] === null && pieces[row][3] === 'R') &&
             isSquareDefended('w', [row, 1]) && isSquareDefended('w', [row, 2]);
